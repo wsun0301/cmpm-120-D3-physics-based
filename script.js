@@ -13,6 +13,7 @@ class PreloadScene extends Phaser.Scene {
 
     preload() {
         this.load.image("graphBackground", "assets/d3 background.png");
+        this.load.audio("bounceSound", "assets/soft_bounce.wav");
     }
 
     create() {
@@ -35,6 +36,7 @@ class IntroScene extends Phaser.Scene {
         this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height);
         this.uiCamera.setScroll(0, 0);
 
+        this.bounceSound = this.sound.add("bounceSound");
         this.mazeObjects = [];
         this.uiObjects = [];
 
@@ -44,6 +46,9 @@ class IntroScene extends Phaser.Scene {
         this.started = false;
         this.mazeAngle = 0;
         this.rotateSpeed = 1.2;
+
+        this.lastBounceTime = 0;
+        this.prevBallVelocity = new Phaser.Math.Vector2(0, 0);
 
         this.physics.world.gravity.y = 500;
 
@@ -58,11 +63,55 @@ class IntroScene extends Phaser.Scene {
         this.createTitleText();
         this.createTutorialMaze();
 
-        this.physics.add.collider(this.ball, this.walls);
+        this.physics.add.collider(this.ball, this.walls, () => {
+            this.playBounceSound();
+        });
 
         this.physics.add.overlap(this.ball, this.exit, () => {
             this.finishTutorial();
         });
+    }
+
+    playBounceSound() {
+        if (!this.started || this.finished) {
+            return;
+        }
+
+        const body = this.ball.body;
+        const currentVelocity = body.velocity;
+        const previousVelocity = this.prevBallVelocity;
+
+        const speed = currentVelocity.length();
+        const previousSpeed = previousVelocity.length();
+
+        // Ignore slow rolling or tiny bumps
+        if (speed < 20 || previousSpeed < 20) {
+            return;
+        }
+
+        // Check if velocity direction changed a lot.
+        // A bounce usually has a strong direction change.
+        const currentDir = currentVelocity.clone().normalize();
+        const previousDir = previousVelocity.clone().normalize();
+
+        const dot = currentDir.dot(previousDir);
+
+        // dot close to 1 = same direction
+        // dot close to 0 = sharp turn
+        // dot below 0 = reversed direction
+        const bounced = dot < 0.65;
+
+        if (!bounced) {
+            return;
+        }
+
+        // Cooldown to prevent spam
+        if (this.time.now - this.lastBounceTime < 180) {
+            return;
+        }
+
+        this.lastBounceTime = this.time.now;
+        this.bounceSound.play();
     }
 
     createTitleText() {
@@ -121,12 +170,13 @@ class IntroScene extends Phaser.Scene {
         this.wallList = [];
         this.walls = this.physics.add.staticGroup();
 
-        this.createWall(400, 250, 300, 20);
+        this.createWall(400, 250, 600, 20);
         this.createWall(400, 410, 300, 20);
+        this.createWall(480, 330, 50, 20);
         this.createWall(250, 330, 20, 180);
         this.createWall(550, 330, 20, 180);
 
-        this.createWall(350, 330, 20, 80);
+        this.createWall(350, 290, 20, 100 );
         this.createWall(450, 290, 20, 100);
 
         // Create ball as a circle shape
@@ -185,26 +235,30 @@ class IntroScene extends Phaser.Scene {
         if (this.background) {
             this.background.rotation = -this.mazeCamera.rotation;
         }
+        if (this.ball && this.ball.body) {
+                this.prevBallVelocity.set(
+                    this.ball.body.velocity.x,
+                    this.ball.body.velocity.y
+            );
+        }
     }
 
     rotateMaze(degrees) {
-        const newAngle = Phaser.Math.Clamp(this.mazeAngle + degrees, -35, 35);
+        this.mazeAngle += degrees;
 
-        if (newAngle === this.mazeAngle) {
-            return;
-        }
-
-        this.mazeAngle = newAngle;
+        // Keeps the angle between 0 and 360
+        this.mazeAngle = Phaser.Math.Wrap(this.mazeAngle, 0, 360);
 
         const radians = Phaser.Math.DegToRad(this.mazeAngle);
 
         const gravityPower = 500;
 
+        // Real gameplay tilt
         this.physics.world.gravity.x = Math.sin(radians) * gravityPower;
         this.physics.world.gravity.y = Math.cos(radians) * gravityPower;
 
-        this.mazeCamera.rotation = Phaser.Math.DegToRad(this.mazeAngle * 0.5);
-
+        // Visual maze rotation
+        this.mazeCamera.rotation = radians;
     }
 
     finishTutorial() {
@@ -268,6 +322,8 @@ class Level1Scene extends Phaser.Scene {
         this.background = addUniversalBackground(this);
         this.uiCamera.ignore(this.background);
 
+        this.bounceSound = this.sound.add("bounceSound");
+
         this.levelStartTime = 0;
         this.started = false;
         this.finished = false;
@@ -275,6 +331,9 @@ class Level1Scene extends Phaser.Scene {
         this.rotateSpeed = 1.2;
 
         this.finalTime = 0;
+
+        this.lastBounceTime = 0;
+        this.prevBallVelocity = new Phaser.Math.Vector2(0, 0);
 
         this.physics.world.gravity.x = 0;
         this.physics.world.gravity.y = 500;
@@ -290,11 +349,55 @@ class Level1Scene extends Phaser.Scene {
         this.createUI();
         this.createLevelMaze(); 
 
-        this.physics.add.collider(this.ball, this.walls);
+        this.physics.add.collider(this.ball, this.walls, () => {
+            this.playBounceSound();
+        });
 
         this.physics.add.overlap(this.ball, this.exit, () => {
             this.finishLevel();
         });
+    }
+
+    playBounceSound() {
+        if (!this.started || this.finished) {
+            return;
+        }
+
+        const body = this.ball.body;
+        const currentVelocity = body.velocity;
+        const previousVelocity = this.prevBallVelocity;
+
+        const speed = currentVelocity.length();
+        const previousSpeed = previousVelocity.length();
+
+        // Ignore slow rolling or tiny bumps
+        if (speed < 20 || previousSpeed < 20) {
+            return;
+        }
+
+        // Check if velocity direction changed a lot.
+        // A bounce usually has a strong direction change.
+        const currentDir = currentVelocity.clone().normalize();
+        const previousDir = previousVelocity.clone().normalize();
+
+        const dot = currentDir.dot(previousDir);
+
+        // dot close to 1 = same direction
+        // dot close to 0 = sharp turn
+        // dot below 0 = reversed direction
+        const bounced = dot < 0.65;
+
+        if (!bounced) {
+            return;
+        }
+
+        // Cooldown to prevent spam
+        if (this.time.now - this.lastBounceTime < 180) {
+            return;
+        }
+
+        this.lastBounceTime = this.time.now;
+        this.bounceSound.play();
     }
 
     createUI() {
@@ -435,6 +538,13 @@ class Level1Scene extends Phaser.Scene {
         if (this.background) {
             this.background.rotation = -this.mazeCamera.rotation;
         }
+
+        if (this.ball && this.ball.body) {
+            this.prevBallVelocity.set(
+                this.ball.body.velocity.x,
+                this.ball.body.velocity.y
+            );
+        }
     }
 
     rotateMaze(degrees) {
@@ -554,6 +664,8 @@ class Level2Scene extends Phaser.Scene {
         this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height);
         this.uiCamera.setScroll(0, 0);
 
+        this.bounceSound = this.sound.add("bounceSound");
+
         this.mazeObjects = [];
         this.uiObjects = [];
 
@@ -566,6 +678,9 @@ class Level2Scene extends Phaser.Scene {
         this.mazeAngle = 0;
         this.rotateSpeed = 1.2;
         this.spikesHit = 0;
+
+        this.lastBounceTime = 0;
+        this.prevBallVelocity = new Phaser.Math.Vector2(0, 0);
 
         this.finalTime = 0;
 
@@ -583,7 +698,9 @@ class Level2Scene extends Phaser.Scene {
         this.createUI();
         this.createLevelMaze(); 
 
-        this.physics.add.collider(this.ball, this.walls);
+        this.physics.add.collider(this.ball, this.walls, () => {
+            this.playBounceSound();
+        });
 
         this.physics.add.overlap(this.ball, this.exit, () => {
             this.finishLevel();
@@ -594,6 +711,48 @@ class Level2Scene extends Phaser.Scene {
                 this.hitSpike();
             });
         });
+    }
+
+    playBounceSound() {
+        if (!this.started || this.finished) {
+            return;
+        }
+
+        const body = this.ball.body;
+        const currentVelocity = body.velocity;
+        const previousVelocity = this.prevBallVelocity;
+
+        const speed = currentVelocity.length();
+        const previousSpeed = previousVelocity.length();
+
+        // Ignore slow rolling or tiny bumps
+        if (speed < 20 || previousSpeed < 20) {
+            return;
+        }
+
+        // Check if velocity direction changed a lot.
+        // A bounce usually has a strong direction change.
+        const currentDir = currentVelocity.clone().normalize();
+        const previousDir = previousVelocity.clone().normalize();
+
+        const dot = currentDir.dot(previousDir);
+
+        // dot close to 1 = same direction
+        // dot close to 0 = sharp turn
+        // dot below 0 = reversed direction
+        const bounced = dot < 0.65;
+
+        if (!bounced) {
+            return;
+        }
+
+        // Cooldown to prevent spam
+        if (this.time.now - this.lastBounceTime < 180) {
+            return;
+        }
+
+        this.lastBounceTime = this.time.now;
+        this.bounceSound.play();
     }
 
     createUI() {
@@ -778,6 +937,13 @@ class Level2Scene extends Phaser.Scene {
         if (this.background) {
             this.background.rotation = -this.mazeCamera.rotation;
         }
+
+        if (this.ball && this.ball.body) {
+            this.prevBallVelocity.set(
+                this.ball.body.velocity.x,
+                this.ball.body.velocity.y
+            );
+        }
     }
 
     rotateMaze(degrees) {
@@ -934,6 +1100,8 @@ class Level3Scene extends Phaser.Scene {
         this.mazeObjects = [];
         this.uiObjects = [];
 
+        this.bounceSound = this.sound.add("bounceSound");
+
         this.background = addUniversalBackground(this);
         this.uiCamera.ignore(this.background);
 
@@ -944,6 +1112,9 @@ class Level3Scene extends Phaser.Scene {
         this.mazeAngle = 0;
         this.rotateSpeed = 1.2;
         this.spikesHit = 0;
+
+        this.lastBounceTime = 0;
+        this.prevBallVelocity = new Phaser.Math.Vector2(0, 0);
 
         this.finalTime = 0;
 
@@ -961,7 +1132,9 @@ class Level3Scene extends Phaser.Scene {
         this.createUI();
         this.createLevelMaze(); 
 
-        this.physics.add.collider(this.ball, this.walls);
+        this.physics.add.collider(this.ball, this.walls, () => {
+            this.playBounceSound();
+        });
 
         this.physics.add.overlap(this.ball, this.checkpoint, () => {
             this.collectCheckpoint();
@@ -980,6 +1153,48 @@ class Level3Scene extends Phaser.Scene {
                 this.hitSpike();
             });
         });
+    }
+
+    playBounceSound() {
+        if (!this.started || this.finished) {
+            return;
+        }
+
+        const body = this.ball.body;
+        const currentVelocity = body.velocity;
+        const previousVelocity = this.prevBallVelocity;
+
+        const speed = currentVelocity.length();
+        const previousSpeed = previousVelocity.length();
+
+        // Ignore slow rolling or tiny bumps
+        if (speed < 20 || previousSpeed < 20) {
+            return;
+        }
+
+        // Check if velocity direction changed a lot.
+        // A bounce usually has a strong direction change.
+        const currentDir = currentVelocity.clone().normalize();
+        const previousDir = previousVelocity.clone().normalize();
+
+        const dot = currentDir.dot(previousDir);
+
+        // dot close to 1 = same direction
+        // dot close to 0 = sharp turn
+        // dot below 0 = reversed direction
+        const bounced = dot < 0.65;
+
+        if (!bounced) {
+            return;
+        }
+
+        // Cooldown to prevent spam
+        if (this.time.now - this.lastBounceTime < 180) {
+            return;
+        }
+
+        this.lastBounceTime = this.time.now;
+        this.bounceSound.play();
     }
 
     createUI() {
@@ -1283,6 +1498,13 @@ class Level3Scene extends Phaser.Scene {
 
         if (this.background) {
             this.background.rotation = -this.mazeCamera.rotation;
+        }
+
+        if (this.ball && this.ball.body) {
+            this.prevBallVelocity.set(
+                this.ball.body.velocity.x,
+                this.ball.body.velocity.y
+            );
         }
     }
 
