@@ -170,17 +170,17 @@ class IntroScene extends Phaser.Scene {
         this.wallList = [];
         this.walls = this.physics.add.staticGroup();
 
-        this.createWall(400, 250, 600, 20);
+        this.createWall(400, 250, 500, 20);
         this.createWall(400, 410, 300, 20);
-        this.createWall(480, 330, 50, 20);
+        this.createWall(480-20, 360+30, 50, 20);
         this.createWall(250, 330, 20, 180);
         this.createWall(550, 330, 20, 180);
 
-        this.createWall(350, 290, 20, 100 );
-        this.createWall(450, 290, 20, 100);
+        this.createWall(350-10, 350+5, 20, 110);
+        this.createWall(450-10, 350+5, 20, 110);
 
         // Create ball as a circle shape
-        this.ball = this.add.circle(300, 330, 14, 0x0000ff);
+        this.ball = this.add.circle(350-10, 270, 14, 0x0000ff);
         this.physics.add.existing(this.ball);
 
         this.ball.body.setCircle(14);
@@ -190,10 +190,10 @@ class IntroScene extends Phaser.Scene {
         this.ball.body.setCollideWorldBounds(true);
 
         // Create exit as a green circle shape
-        this.exit = this.add.circle(510, 370, 24, 0x00aa55);
+        this.exit = this.add.circle(520-10, 385, 14, 0x00aa55);
         this.physics.add.existing(this.exit, true);
 
-        this.exit.body.setCircle(24);
+        this.exit.body.setCircle(14);
 
         this.mazeObjects.push(this.ball);
         this.mazeObjects.push(this.exit);
