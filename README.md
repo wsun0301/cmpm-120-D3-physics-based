@@ -5,6 +5,8 @@ Game created by [WEICHEN SUN].
 
 Background image: GPT Image Generation
 
+Sound: GPT Audio Generation
+
 Built using Phaser 4.
 
 
